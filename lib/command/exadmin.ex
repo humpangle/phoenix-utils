@@ -1,7 +1,4 @@
 defmodule PhoenixUtils.Command.Exadmin do
-  @require_lib ~S{No lib module name found. Please supply lib as part of
-  optional arguments. Type --help to see the help file}
-
   @brunch_config_file "brunch-config.js"
   @repo_text "use Ecto.Repo, otp_app:"
   @scrivener_partial_text "use Scrivener, page_size:"
@@ -12,8 +9,6 @@ defmodule PhoenixUtils.Command.Exadmin do
   @assets_dir "static/assets"
   @pipeline_text "pipeline :browser do"
   @use_exadmin_route_text "use ExAdmin.Router"
-  @mix_exs_module_pattern ~r/defmodule (.+?)\.Mix.+? do/
-  @mix_exs_app_pattern ~r/app: :([a-z\d_]+)?/
 
   @exadmin_route_scope """
   scope "/admin", ExAdmin do
@@ -22,102 +17,57 @@ defmodule PhoenixUtils.Command.Exadmin do
   end
   """
 
-  def run(kwargs, [path | resources]) do
-    path = Path.expand(path)
+  def run(kwargs, resources) do
+    path = Keyword.get(kwargs, :path)
+    config = Path.join(path, "config/config.exs")
+    app = Keyword.get(kwargs, :app)
+    web_path = Keyword.get(kwargs, :web_path)
+    exadmin_install_web_dir = Path.join(path, "web")
+    lib = Keyword.get(kwargs, :lib)
+    lib_path = Keyword.get(kwargs, :lib_path)
 
-    cond do
-      !File.exists?(path) ->
-        IO.puts("Invalid project path: '#{path}'")
+    options = %{
+      exadmin_install_web_dir: exadmin_install_web_dir,
+      app: app,
+      exadmin_dir: create_or_get_exadmin_dir(web_path),
+      web_module: Keyword.get(kwargs, :web, "#{lib}Web"),
+      path: path,
+      config: config,
+      lib: lib,
+      resources: resources,
+      web_path: web_path,
+      brunch_config_file: Path.join(path, @brunch_config_file),
+      lib_path: lib_path,
+      static_dir:
+        Path.join(
+          path,
+          Keyword.get(kwargs, :static_dir, @static_dir)
+        ),
+      vendor_dir: Path.join(exadmin_install_web_dir, @vendor_dir),
+      assets_dir: Path.join(exadmin_install_web_dir, @assets_dir)
+    }
 
-      true ->
-        config = Path.join(path, "config/config.exs")
+    case process_config(options) do
+      :ok ->
+        create_brunch_config(options)
 
-        {lib, app} = get_app_lib_from_mix(path)
-        lib = lib || Keyword.get(kwargs, :lib)
+        run_cmd(
+          "mix",
+          ["admin.install"],
+          env: [{"MIX_ENV", "dev"}],
+          cd: path
+        )
 
-        if lib == nil do
-          IO.puts(@require_lib)
-          System.halt(1)
-        end
+        remove_brunch_config(options)
+        write_repo_file(options)
+        copy_web_files(options)
+        write_route(options)
+        write_dashboard_admin(options)
+        Enum.each(resources, &write_resource_module(&1, options))
+        remove_exadmin_install_web_dir(exadmin_install_web_dir)
 
-        app = app || Keyword.get(kwargs, :app, String.downcase(lib))
-        web_path = Path.join(path, "lib/#{app}_web")
-        lib_path = Path.join(path, "lib/#{app}")
-        exadmin_install_web_dir = Path.join(path, "web")
-
-        options = %{
-          exadmin_install_web_dir: exadmin_install_web_dir,
-          app: app,
-          exadmin_dir: create_or_get_exadmin_dir(web_path),
-          web_module: Keyword.get(kwargs, :web, "#{lib}Web"),
-          path: path,
-          config: config,
-          lib: lib,
-          resources: resources,
-          web_path: web_path,
-          brunch_config_file: Path.join(path, @brunch_config_file),
-          lib_path: lib_path,
-          static_dir:
-            Path.join(
-              path,
-              Keyword.get(kwargs, :static_dir, @static_dir)
-            ),
-          vendor_dir: Path.join(exadmin_install_web_dir, @vendor_dir),
-          assets_dir: Path.join(exadmin_install_web_dir, @assets_dir)
-        }
-
-        case process_config(options) do
-          :ok ->
-            create_brunch_config(options)
-
-            run_cmd(
-              "mix",
-              ["admin.install"],
-              env: [{"MIX_ENV", "dev"}],
-              cd: path
-            )
-
-            remove_brunch_config(options)
-            write_repo_file(options)
-            copy_web_files(options)
-            write_route(options)
-            write_dashboard_admin(options)
-            Enum.each(resources, &write_resource_module(&1, options))
-            remove_exadmin_install_web_dir(exadmin_install_web_dir)
-
-          {:error, _reason} ->
-            IO.puts("Error opening config file: '#{config}'")
-        end
-    end
-  end
-
-  defp get_app_lib_from_mix(path) do
-    IO.puts("*Reading mix file to retrieve lib module and app name")
-
-    case Path.join(path, "mix.exs") |> File.read() do
-      {:ok, mix_text} ->
-        lib =
-          case Regex.run(@mix_exs_module_pattern, mix_text) do
-            [_, lib] ->
-              lib
-
-            _ ->
-              nil
-          end
-
-        app =
-          case Regex.run(@mix_exs_app_pattern, mix_text) do
-            [_, app] ->
-              app
-
-            _ ->
-              nil
-          end
-
-        {lib, app}
-
-      _ ->
-        IO.puts("No mix file found in project root. Exiting.")
+      {:error, _reason} ->
+        IO.puts("Error opening config file: '#{config}'")
     end
   end
 
