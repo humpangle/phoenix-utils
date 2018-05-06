@@ -12,7 +12,7 @@
     {
       "label": "Build escript production",
       "type": "shell",
-      "command": "mix escript.build",
+      "command": "mix escript.build && mv phoenix_utils ..",
       "options": {
         "env": {
           "MIX_ENV": "prod"
