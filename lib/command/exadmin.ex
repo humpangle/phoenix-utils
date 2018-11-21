@@ -67,12 +67,12 @@ defmodule PhoenixUtils.Command.Exadmin do
         remove_exadmin_install_web_dir(exadmin_install_web_dir)
 
       {:error, _reason} ->
-        IO.puts("Error opening config file: '#{config}'")
+        IO.puts(["Error opening config file: '", config, "'"])
     end
   end
 
   defp process_config(%{config: config} = opts) do
-    IO.puts("*Reading config file #{config}")
+    IO.puts(["*Reading config file:", config])
 
     case File.read(config) do
       {:ok, config_text} ->
@@ -99,7 +99,7 @@ defmodule PhoenixUtils.Command.Exadmin do
               )
               |> Enum.join("\n")
 
-            IO.puts("*Writing :exadmin configuration to file #{config}")
+            IO.puts(["*Writing :exadmin configuration to file: ", config])
             IO.puts("")
             IO.puts(exadmin_config_text)
             File.write!(config, new_config_text)
@@ -130,7 +130,7 @@ defmodule PhoenixUtils.Command.Exadmin do
     route_file = Path.join(web_path, "router.ex")
     web_text = "use #{web}, :router"
 
-    IO.puts("*Reading file: #{route_file}")
+    IO.puts(["*Reading file: ", route_file])
 
     case File.read(route_file) do
       {:ok, route_file_text} ->
@@ -158,13 +158,25 @@ defmodule PhoenixUtils.Command.Exadmin do
            &String.contains?(&1, web_text)
          ) do
       nil ->
-        "Couldn't find pattern '#{web_text}' in file #{route_file}, Exiting."
+        [
+          "Couldn't find pattern '",
+          web_text,
+          "'",
+          " in file ",
+          route_file,
+          " , Exiting."
+        ]
         |> IO.puts()
 
         System.halt(0)
 
       index ->
-        ~s(*Writing "#{@use_exadmin_route_text}" into file: #{route_file})
+        [
+          "*Writing ",
+          @use_exadmin_route_text,
+          " into file: ",
+          route_file
+        ]
         |> IO.puts()
 
         List.insert_at(lines, index + 1, @use_exadmin_route_text)
@@ -207,7 +219,7 @@ defmodule PhoenixUtils.Command.Exadmin do
 
     case File.exists?(file) do
       true ->
-        IO.puts("*Resource #{file} already exists. Skipping.")
+        IO.puts(["*Resource ", file, " already exists. Skipping."])
 
       _ ->
         text = """
@@ -219,13 +231,13 @@ defmodule PhoenixUtils.Command.Exadmin do
         end
         """
 
-        IO.puts("*Generating resource file: #{file}")
+        IO.puts(["*Generating resource file: ", file])
         File.write!(file, text)
     end
   end
 
   defp create_brunch_config(%{brunch_config_file: file}) do
-    IO.puts("*Creating brunch config file in #{file}")
+    IO.puts(["*Creating brunch config file in ", file])
     File.touch!(file)
   end
 
@@ -236,17 +248,25 @@ defmodule PhoenixUtils.Command.Exadmin do
 
   defp run_cmd(command, args, opts) do
     cmd_text = [command | args] |> Enum.join(" ")
-    executing_cmd_text = "*Executing command: #{cmd_text} with options:
-    #{inspect(opts)}"
 
-    IO.puts(executing_cmd_text)
+    IO.puts([
+      "*Executing command: ",
+      cmd_text,
+      " with options: ",
+      inspect(opts)
+    ])
 
     case System.cmd(command, args, opts) do
       {_stdo_text, 0} ->
         :ok
 
       {error_text, _} ->
-        IO.puts(~s(command: "#{cmd_text}" failed to run. Exiting.))
+        IO.puts([
+          "command: \"",
+          cmd_text,
+          "\" failed to run. Exiting."
+        ])
+
         IO.puts(error_text)
         System.halt(1)
     end
@@ -255,7 +275,7 @@ defmodule PhoenixUtils.Command.Exadmin do
   defp write_repo_file(%{lib_path: lib_path}) do
     file = Path.join(lib_path, "repo.ex")
 
-    IO.puts("*Reading repo.ex file: #{file}")
+    IO.puts(["*Reading repo.ex file: ", file])
 
     case File.read(file) do
       {:ok, repo_text} ->

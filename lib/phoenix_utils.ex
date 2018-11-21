@@ -51,7 +51,7 @@ defmodule PhoenixUtils do
         process(command, kwargs, args)
 
       _ ->
-        IO.puts("Invalid project path: '#{path}'")
+        IO.puts(["Invalid project path: '", path, "'"])
         System.halt(1)
     end
   end
